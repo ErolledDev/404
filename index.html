@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Short URL Creator</title>
+    <title>URLify Test</title>
     <style>
         body {
             font-family: sans-serif;
@@ -17,7 +17,7 @@
 </head>
 <body>
 
-    <h1>Short URL Creator</h1>
+    <h1>URLify Test</h1>
 
     <label for="longURL">Long URL:</label>
     <input type="text" id="longURL" size="50" value="https://www.example.com"><br><br>
@@ -25,7 +25,7 @@
     <label for="customCode">Custom Code (optional):</label>
     <input type="text" id="customCode" size="20"><br><br>
 
-    <button onclick="createShortLink()">Create Short Link</button>
+    <button onclick="testURLify()">Test URLify API</button>
 
     <div id="results">
         <h2>Results:</h2>
@@ -33,33 +33,34 @@
     </div>
 
     <script>
-        function createShortLink() {
+        async function testURLify() {
             const longURL = document.getElementById('longURL').value;
             const customCode = document.getElementById('customCode').value;
             const responseDiv = document.getElementById('response');
 
-            responseDiv.textContent = "Creating short link...";
+            responseDiv.textContent = "Testing URLify API...";
 
-            fetch('/.netlify/functions/create-short-link', { // Call the Netlify function
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ url: longURL, code: customCode }) // Send data to function
-            })
-            .then(response => {
+            try {
+                const response = await fetch('/.netlify/functions/urlify-proxy', { // Call the proxy function
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: longURL, code: customCode }) // Send data to function
+                });
+
                 if (!response.ok) {
-                    return response.text().then(err => {throw new Error(`HTTP error! status: ${response.status}, message: ${err}`)});
+                    const error = await response.text(); // Get the error message
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${error}`);
                 }
-                return response.json();
-            })
-            .then(data => {
+
+                const data = await response.json();
                 responseDiv.textContent = JSON.stringify(data, null, 2);
-            })
-            .catch(error => {
+
+            } catch (error) {
                 responseDiv.textContent = "Error: " + error.message;
-                console.error("API Error:", error);
-            });
+                console.error("URLify API Error:", error);
+            }
         }
     </script>
 
