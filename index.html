@@ -45,6 +45,10 @@
         button:hover {
             background: #4338ca;
         }
+        button:disabled {
+            background: #a5a5a5;
+            cursor: not-allowed;
+        }
         #results {
             margin-top: 20px;
             border: 1px solid #ddd;
@@ -55,6 +59,36 @@
         pre {
             white-space: pre-wrap;
             word-wrap: break-word;
+        }
+        .error {
+            color: #dc2626;
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .success {
+            color: #059669;
+            background: #d1fae5;
+            border: 1px solid #a7f3d0;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .short-url {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f3f4f6;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .copy-button {
+            background: #059669;
+            margin-top: 10px;
+        }
+        .copy-button:hover {
+            background: #047857;
         }
     </style>
 </head>
@@ -69,7 +103,7 @@
 
         <div class="input-group">
             <label for="longURL">Long URL:</label>
-            <input type="text" id="longURL" value="https://www.example.com" placeholder="Enter URL to shorten">
+            <input type="url" id="longURL" placeholder="Enter URL to shorten (e.g., https://example.com)">
         </div>
 
         <div class="input-group">
@@ -77,11 +111,11 @@
             <input type="text" id="customCode" placeholder="Enter custom code (optional)">
         </div>
 
-        <button onclick="testURLify()">Create Short URL</button>
+        <button onclick="testURLify()" id="submitButton">Create Short URL</button>
 
         <div id="results">
             <h2>Results:</h2>
-            <pre id="response">No results yet</pre>
+            <div id="response">No results yet</div>
         </div>
     </div>
 
@@ -91,18 +125,37 @@
             const longURL = document.getElementById('longURL').value;
             const customCode = document.getElementById('customCode').value;
             const responseDiv = document.getElementById('response');
+            const submitButton = document.getElementById('submitButton');
 
+            // Reset previous results
+            responseDiv.className = '';
+            responseDiv.innerHTML = 'Processing...';
+
+            // Basic validation
             if (!apiKey) {
+                responseDiv.className = 'error';
                 responseDiv.textContent = "Error: API key is required";
                 return;
             }
 
             if (!longURL) {
+                responseDiv.className = 'error';
                 responseDiv.textContent = "Error: URL is required";
                 return;
             }
 
-            responseDiv.textContent = "Creating short URL...";
+            try {
+                // Validate URL format
+                new URL(longURL);
+            } catch {
+                responseDiv.className = 'error';
+                responseDiv.textContent = "Error: Invalid URL format. Please include http:// or https://";
+                return;
+            }
+
+            // Disable button while processing
+            submitButton.disabled = true;
+            submitButton.textContent = 'Creating...';
 
             try {
                 const response = await fetch('/.netlify/functions/create-link', {
@@ -123,18 +176,60 @@
                     throw new Error(data.error || `HTTP error! status: ${response.status}`);
                 }
 
-                // Format the response nicely
+                // Format success response
                 const shortUrl = `${window.location.origin}/${data.code}`;
-                responseDiv.textContent = JSON.stringify({
-                    ...data,
-                    shortUrl
-                }, null, 2);
-
+                responseDiv.innerHTML = `
+                    <div class="success">Short URL created successfully!</div>
+                    <div class="short-url">${shortUrl}</div>
+                    <button onclick="copyToClipboard('${shortUrl}')" class="copy-button">
+                        Copy Short URL
+                    </button>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
             } catch (error) {
-                responseDiv.textContent = "Error: " + error.message;
+                responseDiv.className = 'error';
+                responseDiv.textContent = "Error: " + (error.message || "Failed to create short URL");
                 console.error("URLify API Error:", error);
+            } finally {
+                // Re-enable button
+                submitButton.disabled = false;
+                submitButton.textContent = 'Create Short URL';
             }
         }
+
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                const copyButton = document.querySelector('.copy-button');
+                copyButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyButton.textContent = 'Copy Short URL';
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard');
+            }
+        }
+
+        // Add input validation on the custom code field
+        document.getElementById('customCode').addEventListener('input', function(e) {
+            const value = e.target.value;
+            const validValue = value.replace(/[^a-zA-Z0-9-_]/g, '');
+            if (value !== validValue) {
+                e.target.value = validValue;
+            }
+        });
+
+        // Add URL validation on input
+        document.getElementById('longURL').addEventListener('input', function(e) {
+            const url = e.target.value;
+            try {
+                new URL(url);
+                e.target.setCustomValidity('');
+            } catch {
+                e.target.setCustomValidity('Please enter a valid URL including http:// or https://');
+            }
+        });
     </script>
 </body>
 </html>
